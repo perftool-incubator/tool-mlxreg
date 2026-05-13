@@ -1,0 +1,37 @@
+#!/bin/bash
+exec >mlxreg-stop-stderrout.txt
+exec 2>&1
+
+echo "args: $@"
+echo "hostname: `hostname`"
+
+if [ -e mlxreg-pid.txt ]; then
+    pid=`cat mlxreg-pid.txt`
+    if [ -z "$pid" ]; then
+        echo "PID for mlxreg-collect not found"
+        exit 1
+    fi
+    echo "Stopping mlxreg-collect (PID: $pid)"
+    kill -s SIGTERM $pid
+
+    # Wait for process to terminate
+    wait $pid 2>/dev/null
+
+    echo "Compressing output files..."
+    # Compress all CSV files
+    if [ -d mlxreg-data ]; then
+        find ./mlxreg-data -type f -name "*.csv" | while read line; do
+            echo "  Compressing: $line"
+            xz -3 -T 0 $line
+        done
+        echo "Compression complete"
+    else
+        echo "WARNING: mlxreg-data directory not found"
+    fi
+else
+    echo "mlxreg-pid.txt not found"
+    echo "PWD: `/bin/pwd`"
+    echo "LS:"
+    /bin/ls -l
+    exit 1
+fi

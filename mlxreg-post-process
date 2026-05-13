@@ -1,0 +1,159 @@
+#!/usr/bin/env python3
+# -*- mode: python; indent-tabs-mode: nil; python-indent-level: 4 -*-
+# vim: autoindent tabstop=4 shiftwidth=4 expandtab softtabstop=4 filetype=python
+
+import sys
+import os
+import csv
+import glob
+import re
+import lzma
+from pathlib import Path
+
+TOOLBOX_HOME = os.environ.get('TOOLBOX_HOME')
+if TOOLBOX_HOME is None:
+    print("This script requires libraries that are provided by the toolbox project.")
+    print("Toolbox can be acquired from https://github.com/perftool-incubator/toolbox and")
+    print("then use 'export TOOLBOX_HOME=/path/to/toolbox' so that it can be located.")
+    exit(1)
+else:
+    p = Path(TOOLBOX_HOME) / 'python'
+    if not p.exists() or not p.is_dir():
+        print("ERROR: <TOOLBOX_HOME>/python ('%s') does not exist!" % (p))
+        exit(2)
+    sys.path.append(str(p))
+from toolbox.metrics import log_sample
+from toolbox.metrics import finish_samples
+
+
+def process_mlxreg_csv(filename: str, file_id: str):
+    """
+    Process mlxreg CSV file.
+
+    CSV Format (7 fields):
+    timestamp,date,device,sensor_index,sensor_name,power_watts,status
+    1715213996.234567,2024-05-08 23:59:56,0000:b5:00.0,1,Vr0Pwr,45.2,OK
+    """
+    print(f'mlxreg-post-process: processing CSV: {filename}')
+
+    # Extract device name from filename (e.g., 0000b500.0.csv.xz -> 0000:b5:00.0)
+    device_from_filename = Path(filename).stem
+    if device_from_filename.endswith('.csv'):
+        device_from_filename = device_from_filename[:-4]
+
+    # Convert back to PCI format: insert colons
+    # Pattern: 0000b500.0 -> 0000:b5:00.0
+    match = re.match(r'^(\d{4})(\w{2})(\d{2})\.(\d)$', device_from_filename)
+    if match:
+        device_from_filename = f"{match.group(1)}:{match.group(2)}:{match.group(3)}.{match.group(4)}"
+
+    # Open file (handle both compressed and uncompressed)
+    if filename.endswith('.xz'):
+        file_handle = lzma.open(filename, 'rt')
+    else:
+        file_handle = open(filename, 'r')
+
+    try:
+        reader = csv.DictReader(file_handle)
+        line_count = 0
+
+        for row in reader:
+            # Skip if status is not OK
+            if row['status'] != 'OK':
+                print(f"WARNING: Skipping non-OK status: {row}")
+                continue
+
+            # Convert timestamp to milliseconds
+            timestamp_ms = int(float(row['timestamp']) * 1000)
+
+            # Use device from CSV data, fall back to filename-derived device
+            device = row.get('device', device_from_filename)
+
+            # Map sensor names to metric types for hierarchical organization
+            # This allows tools like get-result to show them as separate metrics
+            sensor_to_metric = {
+                'Vr0Pwr': 'vr0-power',
+                'Vr1Pwr': 'vr1-power',
+                'PwrEnv': 'total-power'
+            }
+
+            sensor_name = row['sensor_name']
+            metric_name = sensor_to_metric.get(sensor_name, sensor_name.lower())
+
+            # Create metric descriptor
+            desc = {
+                'source': 'mlxreg',
+                'type': 'power-watts',
+                'class': 'count'
+            }
+
+            # Create metric names (labels)
+            # Include 'metric' field to differentiate sensors hierarchically
+            names = {
+                'device': device,
+                'sensor_index': row['sensor_index'],
+                'sensor_name': sensor_name,
+                'metric': metric_name
+            }
+
+            # Create sample
+            sample = {
+                'end': timestamp_ms,
+                'value': float(row['power_watts'])
+            }
+
+            # Log the sample
+            log_sample(file_id, desc, names, sample)
+            line_count += 1
+
+        print(f"  Processed {line_count} samples from {Path(filename).name}")
+
+    finally:
+        file_handle.close()
+
+
+def process_all_mlxreg_files():
+    """Process all mlxreg CSV files and write to single metric file"""
+    print("mlxreg-post-process: processing all mlxreg files")
+
+    data_dir = "mlxreg-data"
+
+    # Check if data directory exists
+    if not os.path.isdir(data_dir):
+        print("WARNING: mlxreg-data directory not found (device may not be present on this node)")
+        print("Skipping mlxreg post-processing")
+        return
+
+    # Look for CSV files (both compressed and uncompressed)
+    csv_files = glob.glob(f'{data_dir}/*.csv') + glob.glob(f'{data_dir}/*.csv.xz')
+
+    if not csv_files:
+        print("WARNING: No CSV files found in mlxreg-data/")
+        return
+
+    print(f"Found {len(csv_files)} CSV file(s)")
+
+    # Use single file_id for all mlxreg data
+    file_id = 'mlxreg-telemetry'
+
+    # Process all CSV files
+    for csv_file in csv_files:
+        process_mlxreg_csv(csv_file, file_id)
+
+    # Write all accumulated samples to output file once
+    finish_samples()
+    print("mlxreg-post-process: all mlxreg files complete")
+
+
+def main():
+    print("mlxreg-post-process")
+
+    # Process all mlxreg files
+    process_all_mlxreg_files()
+
+    print("mlxreg post-processing complete")
+    return 0
+
+
+if __name__ == '__main__':
+    exit(main())

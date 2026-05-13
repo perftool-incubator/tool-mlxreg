@@ -1,0 +1,157 @@
+#!/bin/bash
+exec >mlxreg-start-stderrout.txt
+exec 2>&1
+
+echo "args: $@"
+echo "pwd: `/bin/pwd`"
+echo "hostname: `hostname`"
+
+# defaults
+devices=""
+sensors="1,2,6"
+interval=2
+mlxreg_collect="/usr/bin/mlxreg-collect"
+
+longopts="devices:,sensors:,interval:"
+opts=$(getopt -q -o "" --longoptions "$longopts" -n "getopt.sh" -- "$@");
+if [ $? -ne 0 ]; then
+    printf -- "\tUnrecognized option specified\n\n"
+    exit 1
+fi
+eval set -- "$opts";
+while true; do
+    case "$1" in
+        --devices)
+            shift;
+            devices=$1
+            echo "devices=$devices"
+            shift;
+            ;;
+        --sensors)
+            shift;
+            sensors=$1
+            echo "sensors=$sensors"
+            shift;
+            ;;
+        --interval)
+            shift;
+            interval=$1
+            echo "interval=$interval"
+            shift;
+            ;;
+        --)
+            shift;
+            break
+            ;;
+        *)
+            echo "Invalid option: $1"
+            exit 1
+    esac
+done
+
+# Validate required parameters
+if [ -z "$devices" ]; then
+    echo "ERROR: --devices parameter is required"
+    echo "Example: --devices 0000:b5:00.0 or --devices ens7f0np0"
+    echo "         --devices 0000:b5:00.0,0000:c3:00.0 or --devices ens7f0np0,ens8f0np0"
+    exit 1
+fi
+
+# Function to convert interface name to PCI address
+get_pci_from_interface() {
+    local iface=$1
+    local pci_path="/sys/class/net/$iface/device"
+
+    if [ ! -e "$pci_path" ]; then
+        echo "ERROR: Network interface $iface not found in /sys/class/net/" >&2
+        return 1
+    fi
+
+    # Get PCI address from sysfs (returns format like 0000:b5:00.0)
+    local pci_addr=$(basename $(readlink -f $pci_path))
+
+    if [ -z "$pci_addr" ]; then
+        echo "ERROR: Could not determine PCI address for interface $iface" >&2
+        return 1
+    fi
+
+    echo "$pci_addr"
+    return 0
+}
+
+# Convert interface names to PCI addresses
+echo "Processing device list: $devices"
+converted_devices=""
+for device in $(echo $devices | sed -e 's/,/ /g'); do
+    # Check if device looks like a PCI address (format: 0000:00:00.0)
+    if [[ "$device" =~ ^[0-9a-fA-F]{4}:[0-9a-fA-F]{2}:[0-9a-fA-F]{2}\.[0-9]$ ]]; then
+        echo "  $device is a PCI address (using as-is)"
+        converted_devices="${converted_devices}${device},"
+    else
+        # Assume it's an interface name
+        echo "  $device looks like an interface name, resolving PCI address..."
+        pci_addr=$(get_pci_from_interface "$device")
+        if [ $? -ne 0 ]; then
+            echo "ERROR: Failed to resolve interface $device to PCI address"
+            exit 1
+        fi
+        echo "    Resolved $device -> $pci_addr"
+        converted_devices="${converted_devices}${pci_addr},"
+    fi
+done
+
+# Remove trailing comma
+devices=$(echo "$converted_devices" | sed 's/,$//')
+echo "Final device list: $devices"
+
+# Validate interval
+re='^[1-9][0-9]*$'
+if [[ ! "$interval" =~ $re ]]; then
+    echo "ERROR: interval must be a positive integer, got: $interval"
+    exit 1
+fi
+
+# Validate sensors
+for sensor in $(echo $sensors | sed -e 's/,/ /g'); do
+    if [[ ! "$sensor" =~ $re ]]; then
+        echo "ERROR: sensor index must be a positive integer, got: $sensor"
+        exit 1
+    fi
+done
+
+# Verify mlxreg is available
+if ! command -v mlxreg >/dev/null 2>&1; then
+    echo "ERROR: mlxreg command not found"
+    echo "This tool requires Mellanox Firmware Tools (MFT) to be installed"
+    exit 1
+fi
+
+# Test device access for each device
+echo "Testing device access..."
+for device in $(echo $devices | sed -e 's/,/ /g'); do
+    echo "  Testing device: $device"
+    if ! mlxreg --device $device --reg_name MVCAP --get >/dev/null 2>&1; then
+        echo "ERROR: Cannot access device $device"
+        echo "Ensure the container is running with --privileged and device is present"
+        lspci | grep -i mellanox || echo "No Mellanox devices found via lspci"
+        exit 1
+    fi
+    echo "  Device $device: OK"
+done
+
+echo "Device validation successful"
+
+/bin/rm -f mlxreg-pid.txt
+if [ -e $mlxreg_collect ]; then
+    $mlxreg_collect "$devices" "$sensors" $interval &
+    mlxreg_pid=$!
+    if [ -z "$mlxreg_pid" ]; then
+        echo "Could not get mlxreg-collect PID, exiting"
+        exit 1
+    fi
+    echo "mlxreg-collect pid is $mlxreg_pid"
+    echo $mlxreg_pid >mlxreg-pid.txt
+else
+    echo "$mlxreg_collect is not present, exiting"
+    exit 1
+fi

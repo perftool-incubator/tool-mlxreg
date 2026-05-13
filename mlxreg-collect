@@ -1,0 +1,107 @@
+#!/bin/bash
+
+devices=$1; shift
+sensors=$1; shift
+interval=$1; shift
+
+# Validation
+re='^[1-9][0-9]*$'
+if [[ ! "$interval" =~ $re ]]; then
+    echo "ERROR: Interval must be a positive integer, exiting"
+    exit 1
+fi
+
+if [ "`/bin/pwd`" == "/" ]; then
+    echo "Don't run this in /"
+    exit 2
+fi
+
+if [ -z "$devices" ]; then
+    echo "ERROR: No devices specified, exiting"
+    exit 3
+fi
+
+if [ -z "$sensors" ]; then
+    echo "ERROR: No sensors specified, exiting"
+    exit 4
+fi
+
+# Convert comma-separated lists to arrays
+IFS=',' read -ra device_array <<< "$devices"
+IFS=',' read -ra sensor_array <<< "$sensors"
+
+echo "Collecting from devices: ${device_array[@]}"
+echo "Collecting sensors: ${sensor_array[@]}"
+echo "Interval: ${interval}s"
+
+# Create output directory
+mkdir -p mlxreg-data
+
+# Helper function to decode sensor name from hex
+decode_sensor_name() {
+    local hi=$1
+    local lo=$2
+    # Convert hex to ASCII, removing null bytes
+    python3 -c "import sys; hi='$hi'; lo='$lo'; print((bytes.fromhex(hi[2:]) + bytes.fromhex(lo[2:])).decode('ascii', errors='ignore').rstrip('\x00'))" 2>/dev/null || echo "unknown"
+}
+
+# Helper function to query a single sensor
+query_sensor() {
+    local device=$1
+    local sensor_idx=$2
+    local timestamp=$3
+    local date_str=$4
+
+    # Query the sensor
+    local output=$(mlxreg --device $device --reg_name MVCR --indexes "sensor_index=$sensor_idx" --get 2>&1)
+
+    if [ $? -ne 0 ]; then
+        echo "$timestamp,$date_str,$device,$sensor_idx,ERROR,0.0,query_failed" >> "mlxreg-data/${device//://}.csv"
+        return 1
+    fi
+
+    # Parse output
+    local power_hex=$(echo "$output" | grep "^power_sensor_value" | awk '{print $NF}')
+    local name_hi=$(echo "$output" | grep "^sensor_name_hi" | awk '{print $NF}')
+    local name_lo=$(echo "$output" | grep "^sensor_name_lo" | awk '{print $NF}')
+
+    if [ -z "$power_hex" ]; then
+        echo "$timestamp,$date_str,$device,$sensor_idx,ERROR,0.0,parse_failed" >> "mlxreg-data/${device//://}.csv"
+        return 1
+    fi
+
+    # Convert hex to decimal and divide by 10 for watts
+    local power_raw=$((16#${power_hex#0x}))
+    local power_watts=$(awk "BEGIN {printf \"%.1f\", $power_raw / 10.0}")
+
+    # Decode sensor name
+    local sensor_name=$(decode_sensor_name "$name_hi" "$name_lo")
+
+    # Write to CSV: timestamp,date,device,sensor_index,sensor_name,power_watts,status
+    echo "$timestamp,$date_str,$device,$sensor_idx,$sensor_name,$power_watts,OK" >> "mlxreg-data/${device//:}.csv"
+}
+
+# Create CSV headers for each device
+for device in "${device_array[@]}"; do
+    csv_file="mlxreg-data/${device//:}.csv"
+    echo "timestamp,date,device,sensor_index,sensor_name,power_watts,status" > "$csv_file"
+    echo "Created output file: $csv_file"
+done
+
+echo "Starting collection loop..."
+
+# Main collection loop
+while true; do
+    timestamp=$(date +%s.%N)
+    date_str=$(date +"%Y-%m-%d %H:%M:%S")
+
+    # Collect from each device
+    for device in "${device_array[@]}"; do
+        # Collect each sensor
+        for sensor_idx in "${sensor_array[@]}"; do
+            query_sensor "$device" "$sensor_idx" "$timestamp" "$date_str"
+        done
+    done
+
+    sleep $interval
+done
