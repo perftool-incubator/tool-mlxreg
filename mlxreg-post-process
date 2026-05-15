@@ -22,11 +22,10 @@ else:
         print("ERROR: <TOOLBOX_HOME>/python ('%s') does not exist!" % (p))
         exit(2)
     sys.path.append(str(p))
-from toolbox.metrics import log_sample
-from toolbox.metrics import finish_samples
+from toolbox.cdm_metrics import CDMMetrics
 
 
-def process_mlxreg_csv(filename: str, file_id: str):
+def process_mlxreg_csv(filename: str, file_id: str, metrics: CDMMetrics):
     """
     Process mlxreg CSV file.
 
@@ -103,7 +102,7 @@ def process_mlxreg_csv(filename: str, file_id: str):
             }
 
             # Log the sample
-            log_sample(file_id, desc, names, sample)
+            metrics.log_sample(file_id, desc, names, sample)
             line_count += 1
 
         print(f"  Processed {line_count} samples from {Path(filename).name}")
@@ -133,15 +132,18 @@ def process_all_mlxreg_files():
 
     print(f"Found {len(csv_files)} CSV file(s)")
 
+    # Create CDMMetrics instance
+    metrics = CDMMetrics()
+
     # Use single file_id for all mlxreg data
     file_id = 'mlxreg-telemetry'
 
     # Process all CSV files
     for csv_file in csv_files:
-        process_mlxreg_csv(csv_file, file_id)
+        process_mlxreg_csv(csv_file, file_id, metrics)
 
     # Write all accumulated samples to output file once
-    finish_samples()
+    metrics.finish_samples()
     print("mlxreg-post-process: all mlxreg files complete")
 
 

@@ -16,7 +16,6 @@
             "type": "distro",
             "distro_info": {
                 "packages": [
-                    "rpm-build",
                     "kmod",
                     "libibverbs",
                     "libmlx5",

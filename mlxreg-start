@@ -8,7 +8,7 @@ echo "hostname: `hostname`"
 
 # defaults
 devices=""
-sensors="1,2,6"
+sensors="1,2,6,127"
 interval=2
 mlxreg_collect="/usr/bin/mlxreg-collect"
 
