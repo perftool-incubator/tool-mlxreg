@@ -73,7 +73,8 @@ def process_mlxreg_csv(filename: str, file_id: str, metrics: CDMMetrics):
             sensor_to_metric = {
                 'Vr0Pwr': 'vr0-power',
                 'Vr1Pwr': 'vr1-power',
-                'PwrEnv': 'total-power'
+                'PwrEnv': 'power-env',
+                'TOT PWR': 'total-power'
             }
 
             sensor_name = row['sensor_name']
