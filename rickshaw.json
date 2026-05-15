@@ -1,0 +1,49 @@
+{
+    "rickshaw-tool": {
+        "schema": {
+            "version": "2020.03.18"
+        }
+    },
+    "tool": "mlxreg",
+    "controller": {
+        "post-script": "%tool-dir%/mlxreg-post-process"
+    },
+    "collector": {
+        "files-from-controller": [
+            {
+                "src": "%tool-dir%/mlxreg-start",
+                "dest": "/usr/bin/"
+            },
+            {
+                "src": "%tool-dir%/mlxreg-collect",
+                "dest": "/usr/bin/"
+            },
+            {
+                "src": "%tool-dir%/mlxreg-stop",
+                "dest": "/usr/bin/"
+            }
+        ],
+        "blacklist": [
+            {
+                "endpoint": "remotehosts",
+                "collector-types": [ "client", "server" ]
+            },
+            {
+                "endpoint": "kube",
+                "collector-types": [ "client", "server" ]
+            }
+        ],
+        "whitelist": [
+            {
+                "endpoint": "remotehosts",
+                "collector-types": [ "profiler" ]
+            },
+            {
+                "endpoint": "kube",
+                "collector-types": [ "profiler" ]
+            }
+        ],
+        "start": "mlxreg-start",
+        "stop": "mlxreg-stop"
+      }
+}

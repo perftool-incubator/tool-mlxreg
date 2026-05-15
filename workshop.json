@@ -1,0 +1,44 @@
+{
+    "workshop": {
+        "schema": {
+            "version": "2020.04.30"
+        }
+    },
+    "userenvs": [
+        {
+            "name": "default",
+            "requirements": ["base-packages", "mft-tools"]
+        }
+    ],
+    "requirements": [
+        {
+            "name": "base-packages",
+            "type": "distro",
+            "distro_info": {
+                "packages": [
+                    "kmod",
+                    "libibverbs",
+                    "libmlx5",
+                    "tar",
+                    "gzip"
+                ]
+            }
+        },
+        {
+            "name": "mft-tools",
+            "type": "source",
+            "source_info": {
+                "url": "https://www.mellanox.com/downloads/MFT/mft-4.35.0-159-x86_64-rpm.tgz",
+                "filename": "mft-4.35.0-159-x86_64-rpm.tgz",
+                "commands": {
+                    "unpack": "tar -xzf mft-4.35.0-159-x86_64-rpm.tgz",
+                    "get_dir": "echo mft-4.35.0-159-x86_64-rpm",
+                    "commands": [
+                        "rpm -ivh RPMS/mft-4.35.0-159.x86_64.rpm RPMS/mft-mlx5-4.35.0-159.x86_64.rpm",
+                        "mlxreg --version"
+                    ]
+                }
+            }
+        }
+    ]
+}
