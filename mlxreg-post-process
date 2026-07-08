@@ -35,16 +35,14 @@ def process_mlxreg_csv(filename: str, file_id: str, metrics: CDMMetrics):
     """
     print(f'mlxreg-post-process: processing CSV: {filename}')
 
-    # Extract device name from filename (e.g., 0000b500.0.csv.xz -> 0000:b5:00.0)
+    # Extract device name from filename (e.g., 0000_03_00.0.csv.xz -> 0000:03:00.0)
     device_from_filename = Path(filename).stem
     if device_from_filename.endswith('.csv'):
         device_from_filename = device_from_filename[:-4]
 
-    # Convert back to PCI format: insert colons
-    # Pattern: 0000b500.0 -> 0000:b5:00.0
-    match = re.match(r'^(\d{4})(\w{2})(\d{2})\.(\d)$', device_from_filename)
-    if match:
-        device_from_filename = f"{match.group(1)}:{match.group(2)}:{match.group(3)}.{match.group(4)}"
+    # Convert back to PCI format: replace underscores with colons
+    # Pattern: 0000_03_00.0 -> 0000:03:00.0
+    device_from_filename = device_from_filename.replace('_', ':')
 
     # Open file (handle both compressed and uncompressed)
     if filename.endswith('.xz'):
