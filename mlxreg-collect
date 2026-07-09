@@ -56,7 +56,7 @@ query_sensor() {
     local output=$(mlxreg --device $device --reg_name MVCR --indexes "sensor_index=$sensor_idx" --get 2>&1)
 
     if [ $? -ne 0 ]; then
-        echo "$timestamp,$date_str,$device,$sensor_idx,ERROR,0.0,query_failed" >> "mlxreg-data/${device//://}.csv"
+        echo "$timestamp,$date_str,$device,$sensor_idx,ERROR,0.0,query_failed" >> "mlxreg-data/${device//:/_}.csv"
         return 1
     fi
 
@@ -66,7 +66,7 @@ query_sensor() {
     local name_lo=$(echo "$output" | grep "^sensor_name_lo" | awk '{print $NF}')
 
     if [ -z "$power_hex" ]; then
-        echo "$timestamp,$date_str,$device,$sensor_idx,ERROR,0.0,parse_failed" >> "mlxreg-data/${device//://}.csv"
+        echo "$timestamp,$date_str,$device,$sensor_idx,ERROR,0.0,parse_failed" >> "mlxreg-data/${device//:/_}.csv"
         return 1
     fi
 
@@ -78,12 +78,12 @@ query_sensor() {
     local sensor_name=$(decode_sensor_name "$name_hi" "$name_lo")
 
     # Write to CSV: timestamp,date,device,sensor_index,sensor_name,power_watts,status
-    echo "$timestamp,$date_str,$device,$sensor_idx,$sensor_name,$power_watts,OK" >> "mlxreg-data/${device//:}.csv"
+    echo "$timestamp,$date_str,$device,$sensor_idx,$sensor_name,$power_watts,OK" >> "mlxreg-data/${device//:/_}.csv"
 }
 
 # Create CSV headers for each device
 for device in "${device_array[@]}"; do
-    csv_file="mlxreg-data/${device//:}.csv"
+    csv_file="mlxreg-data/${device//:/_}.csv"
     echo "timestamp,date,device,sensor_index,sensor_name,power_watts,status" > "$csv_file"
     echo "Created output file: $csv_file"
 done
