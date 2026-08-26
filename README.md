@@ -156,19 +156,20 @@ Use the first PCI function (e.g., `0000:b5:00.0`) as the `--devices` parameter:
 |-----------|----------|---------|-------------|
 | `--devices` | **Yes** | - | Comma-separated device identifiers. Can be either:<br>• Network interface names: `ens7f0np0` or `ens7f0np0,ens8f0np0`<br>• PCI BDF addresses: `0000:b5:00.0` or `0000:b5:00.0,0000:c3:00.0`<br>The tool automatically converts interface names to PCI addresses |
 | `--interval` | No | `2` | Collection interval in seconds |
-| `--sensors` | No | `1,2,6` | Comma-separated MVCR sensor indices to collect |
+| `--sensors` | No | `1,2,6,127` | Comma-separated MVCR sensor indices to collect |
 
 ### Sensor Indices
 
 The tool queries the `MVCR` (Voltage/Current/Power) register from the BF-3 DPU. The BF-3 DPU exposes 21 power sensors (indices 1-21), but only a subset provides actual power consumption data:
 
-#### Active Power Sensors (Default Collection: 1,2,6)
+#### Active Power Sensors (Default Collection: 1,2,6,127)
 
 | Sensor Index | Sensor Name | Description | Typical Value | Notes |
 |--------------|-------------|-------------|---------------|-------|
 | 1 | `Vr0Pwr` | Voltage Regulator 0 power | ~17W | Core power supply |
 | 2 | `Vr1Pwr` | Voltage Regulator 1 power | ~28W | I/O power supply |
 | 6 | `PwrEnv` | Environmental/Total power | ~124W | **Total device power** |
+| 127 | `TOT PWR` | Total module power | ~124W | **Total board power** |
 
 **Power Breakdown:**
 - **Total BF-3 Power (PwrEnv):** ~124W
@@ -182,7 +183,7 @@ The tool queries the `MVCR` (Voltage/Current/Power) register from the BF-3 DPU. 
 - Network controller power
 - Other internal components
 
-For most use cases, collecting sensors **1, 2, and 6** provides both total power and component-level breakdown.
+For most use cases, collecting sensors **1, 2, 6, and 127** provides both total power and component-level breakdown.
 
 #### Additional Sensors (Status/Diagnostic)
 
