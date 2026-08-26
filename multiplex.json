@@ -1,0 +1,25 @@
+{
+    "presets": {
+        "defaults" : [
+            { "arg": "sensors", "vals": ["1,2,6,127"] },
+            { "arg": "interval", "vals": ["2"] }
+        ]
+    },
+    "validations": {
+        "device_list" : {
+            "description" : "comma-separated list of PCI addresses (e.g. 0000:b5:00.0) or network interface names (e.g. ens7f0np0)",
+            "args" : [ "devices" ],
+            "vals": "^[A-Za-z0-9_.:@-]+(,[A-Za-z0-9_.:@-]+)*$"
+        },
+        "sensor_list" : {
+            "description" : "comma-separated list of sensor index integers (default: 1,2,6,127)",
+            "args" : [ "sensors" ],
+            "vals": "^[1-9][0-9]*(,[1-9][0-9]*)*$"
+        },
+        "positive_integer" : {
+            "description" : "a whole number greater than 0",
+            "args" : [ "interval" ],
+            "vals": "^[1-9][0-9]*$"
+        }
+    }
+}
