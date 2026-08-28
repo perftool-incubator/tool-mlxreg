@@ -1,0 +1,22 @@
+{
+  "rickshaw-tool-metadata": {
+    "schema": {
+      "version": "2026.08.11"
+    }
+  },
+  "tool": "mlxreg",
+  "description": "Mellanox NIC power consumption monitoring via Mellanox Firmware Tools (mlxreg) accessing hardware power sensors (e.g. Vr0Pwr, Vr1Pwr, PwrEnv, TOT PWR).",
+  "cdm_indexed": true,
+  "cdm_sources": [
+    {
+      "source": "mlxreg",
+      "types": ["power-watts"]
+    }
+  ],
+  "output_files": [
+    "mlxreg-data/<device>.csv.xz",
+    "mlxreg-pid.txt",
+    "mlxreg-start-stderrout.txt",
+    "mlxreg-stop-stderrout.txt"
+  ]
+}
